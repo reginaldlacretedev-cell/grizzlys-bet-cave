@@ -111,16 +111,22 @@ date = st.date_input("Select Date", datetime.date.today())
 if st.button("🚀 Run Research", type="primary", use_container_width=True):
     date_str = date.strftime("%Y-%m-%d")
     with st.spinner(f"Fetching data for {date_str}..."):
-        # Fetch schedule and basic matchups
-        schedule_html = safe_get(f"https://www.teamrankings.com/mlb/schedules/?date={date_str}")
         matchups = []
+        schedule_html = safe_get(f"https://www.teamrankings.com/mlb/schedules/?date={date_str}")
         if schedule_html:
             soup = BeautifulSoup(schedule_html, "lxml")
             for a in soup.find_all("a", href=True):
                 href = a["href"]
                 if "/mlb/matchup/" in href:
+                    full_url = f"https://www.teamrankings.com{href}" if href.startswith("/") else href
                     display = a.get_text(strip=True)
-                    matchups.append({"matchup": display or "Team vs Opponent", "sections": {}})
+                    # Fetch power ratings and trends for this matchup
+                    sections = {}
+                    for sub in ["power-ratings", "trends"]:
+                        sub_html = safe_get(full_url + "/" + sub)
+                        if sub_html:
+                            sections[sub] = {"tables": extract_tables(sub_html)}
+                    matchups.append({"matchup": display, "sections": sections})
         
         picks = rank_daily_picks(matchups)
         
@@ -138,6 +144,6 @@ if st.button("🚀 Run Research", type="primary", use_container_width=True):
                 for p in picks[6:9]:
                     st.write(f"- {p['team']} +1.5 vs {p['opponent']} (Score: {p['score']})")
         else:
-            st.warning("No strong underdog picks found. Try a different date or check connection.")
+            st.warning("No strong underdog picks found for this date. Try tomorrow or check connection.")
 
 st.caption("Built for Grizzly's Bet Cave")
