@@ -24,7 +24,7 @@ if st.button("Login"):
 if not st.session_state.authenticated:
     st.stop()
 
-# Core Functions
+# ====================== CORE FUNCTIONS ======================
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 def safe_get(url, timeout=30):
@@ -40,19 +40,18 @@ def extract_tables(html, base_title=""):
         return []
     soup = BeautifulSoup(html, "lxml")
     results = []
-    tables = soup.find_all("table")
-    for idx, table in enumerate(tables):
+    for idx, table in enumerate(soup.find_all("table")):
         try:
             title = base_title
-            prev_header = table.find_previous(["h1", "h2", "h3", "h4", "h5", "caption", "strong", "b"])
-            if prev_header:
-                title = prev_header.get_text(strip=True)[:120]
-            dfs = pd.read_html(StringIO(str(table)), header=0, flavor="lxml")
+            prev = table.find_previous(["h1","h2","h3","h4","caption"])
+            if prev:
+                title = prev.get_text(strip=True)[:120]
+            dfs = pd.read_html(StringIO(str(table)), header=0)
             if dfs:
                 df = dfs[0].dropna(how="all", axis=1).dropna(how="all", axis=0)
-                if not df.empty and len(df.columns) > 1:
-                    results.append((title or f"Table_{idx+1}", df))
-        except Exception:
+                if not df.empty:
+                    results.append((title, df))
+        except:
             continue
     return results
 
@@ -131,7 +130,8 @@ date = st.date_input("Select Date", datetime.date.today())
 
 if st.button("🚀 Run Research", type="primary", use_container_width=True):
     date_str = date.strftime("%Y-%m-%d")
-    with st.spinner(f"Fetching data for {date_str}..."):
+    with st.spinner(f"Fetching from TeamRankings, MLB, Rotowire..."):
+        # Fetch schedule
         matchups = []
         schedule_html = safe_get(f"https://www.teamrankings.com/mlb/schedules/?date={date_str}")
         if schedule_html:
@@ -141,13 +141,16 @@ if st.button("🚀 Run Research", type="primary", use_container_width=True):
                 if "/mlb/matchup/" in href:
                     full_url = f"https://www.teamrankings.com{href}" if href.startswith("/") else href
                     display = a.get_text(strip=True)
-                    # Fetch key subpages
                     sections = {}
+                    # Fetch key subpages
                     for sub in ["power-ratings", "trends"]:
                         sub_html = safe_get(full_url + "/" + sub)
                         if sub_html:
                             sections[sub] = {"tables": extract_tables(sub_html)}
                     matchups.append({"matchup": display, "sections": sections})
+        
+        # Rotowire
+        rotowire_html = safe_get("https://www.rotowire.com/baseball/daily-lineups.php")
         
         picks = rank_daily_picks(matchups)
         
@@ -165,6 +168,6 @@ if st.button("🚀 Run Research", type="primary", use_container_width=True):
                 for p in picks[6:9]:
                     st.write(f"- {p['team']} +1.5 vs {p['opponent']} (Score: {p['score']})")
         else:
-            st.warning("No strong underdog picks found for this date. Try a different date.")
+            st.warning("No strong underdog picks found. Try a different date.")
 
-st.caption("Built for Grizzly's Bet Cave")
+st.caption("Built for Grizzly's Bet Cave • Data from TeamRankings, MLB.com, Rotowire")
