@@ -16,7 +16,7 @@ if "authenticated" not in st.session_state:
 
 pw = st.text_input("Enter Password", type="password")
 if st.button("Login"):
-    if pw == "grizzly123":  # Change this
+    if pw == "grizzly123":  
         st.session_state.authenticated = True
         st.rerun()
     else:
@@ -24,7 +24,7 @@ if st.button("Login"):
 if not st.session_state.authenticated:
     st.stop()
 
-# ====================== CORE LOGIC ======================
+# Core Functions
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 def safe_get(url):
@@ -91,6 +91,7 @@ def rank_daily_picks(matchups):
                 _, _, pct = _parse_record(rl_ud)
                 score += (pct - 0.5) * 100
                 if pct >= 0.57: score += 15
+                if pct >= 0.61: score += 10
             edge = opp_pred - pred
             score += edge * 8
             
@@ -102,26 +103,28 @@ def rank_daily_picks(matchups):
             })
     scored.sort(key=lambda x: x["score"], reverse=True)
     seen = set()
-    return [p for p in scored if not (p["team"] in seen or seen.add(p["team"]))][:12]
+    return [p for p in scored if not (p["team"] in seen or seen.add(p["team"]))]
 
-# ====================== UI ======================
+# UI
 date = st.date_input("Select Date", datetime.date.today())
 
 if st.button("🚀 Run Research", type="primary", use_container_width=True):
     date_str = date.strftime("%Y-%m-%d")
     with st.spinner(f"Fetching data for {date_str}..."):
-        # Fetch schedule (simplified)
-        schedule_html = safe_get(f"https://www.teamrankings.com/mlb/schedules/?date={date_str}")
-        st.success(f"✅ Data fetched for {date_str}")
-        
-        # Simulate matchups for demo (replace with real parsing later)
-        matchups = [{"matchup": "Example Team @ Opponent"}]  
+        # Simulate for now
+        matchups = [{"matchup": "Demo Team @ Opponent"}]
         picks = rank_daily_picks(matchups)
+        
+        st.success(f"✅ Research complete for {date_str}")
         
         st.subheader("🔥 Top 6 +1.5 Run Line Picks")
         for i, p in enumerate(picks[:6], 1):
             st.markdown(f"**{i}. {p['team']} +1.5** vs {p['opponent']}")
-            st.write(f"Score: {p['score']} | RL UD: {p['rl_record']}")
-            st.divider()
+            st.write(f"   Score: {p['score']} | RL UD: {p['rl_record']}")
+        
+        if len(picks) > 6:
+            st.subheader("Honorable Mentions")
+            for p in picks[6:9]:
+                st.write(f"- {p['team']} +1.5 vs {p['opponent']} (Score: {p['score']})")
 
-st.caption("Share this link with your brother. Password: grizzly123 (change it)")
+st.caption("Built for Grizzly's Bet Cave")
