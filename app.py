@@ -35,6 +35,27 @@ def safe_get(url, timeout=30):
     except:
         return None
 
+def extract_tables(html, base_title=""):
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "lxml")
+    results = []
+    tables = soup.find_all("table")
+    for idx, table in enumerate(tables):
+        try:
+            title = base_title
+            prev_header = table.find_previous(["h1", "h2", "h3", "h4", "h5", "caption", "strong", "b"])
+            if prev_header:
+                title = prev_header.get_text(strip=True)[:120]
+            dfs = pd.read_html(StringIO(str(table)), header=0, flavor="lxml")
+            if dfs:
+                df = dfs[0].dropna(how="all", axis=1).dropna(how="all", axis=0)
+                if not df.empty and len(df.columns) > 1:
+                    results.append((title or f"Table_{idx+1}", df))
+        except Exception:
+            continue
+    return results
+
 def _parse_record(rec_str):
     if not rec_str:
         return 0, 0, 0.5
@@ -120,7 +141,7 @@ if st.button("🚀 Run Research", type="primary", use_container_width=True):
                 if "/mlb/matchup/" in href:
                     full_url = f"https://www.teamrankings.com{href}" if href.startswith("/") else href
                     display = a.get_text(strip=True)
-                    # Fetch power ratings and trends for this matchup
+                    # Fetch key subpages
                     sections = {}
                     for sub in ["power-ratings", "trends"]:
                         sub_html = safe_get(full_url + "/" + sub)
@@ -144,6 +165,6 @@ if st.button("🚀 Run Research", type="primary", use_container_width=True):
                 for p in picks[6:9]:
                     st.write(f"- {p['team']} +1.5 vs {p['opponent']} (Score: {p['score']})")
         else:
-            st.warning("No strong underdog picks found for this date. Try tomorrow or check connection.")
+            st.warning("No strong underdog picks found for this date. Try a different date.")
 
 st.caption("Built for Grizzly's Bet Cave")
